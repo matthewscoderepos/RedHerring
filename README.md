@@ -3,8 +3,9 @@ Computer Architecture Project
 
 by 
 
-Matthew Sutton
-Calvin Crino
+Matthew Sutton \n
+Calvin Crino \n
+and \n
 James Bors
 
 This program will encode/decode messages into/from a given picture via:
