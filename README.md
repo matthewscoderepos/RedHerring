@@ -1,4 +1,4 @@
-# Picture Encoding Project
+# Red Herring Steganography
 Computer Architecture Project
 
 by 

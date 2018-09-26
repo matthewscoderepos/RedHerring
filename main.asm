@@ -1,5 +1,5 @@
 ##############################
-#      Picture Project       #
+#      Red Herring           #
 #                            #
 #      Matthew Sutton        #
 #       Calvin Crino         #
