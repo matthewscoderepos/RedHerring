@@ -1,4 +1,4 @@
-# Picture Encoding Project
+# Red Herring
 Computer Architecture Project
 
 by 
