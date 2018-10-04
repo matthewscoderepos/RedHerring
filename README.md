@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Red Herring Steganography
+=======
+# Red Herring
+>>>>>>> 7e7666fc818186fce066a5479629ea77cdfd8c36
 Computer Architecture Project
 
 by 
