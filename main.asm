@@ -86,6 +86,22 @@ readPicture:
 	closef ($s2, reg)
 	
 	# at this point we'll need the message to start encoding
+	# but in this instance im just going to over write the last bit of every byte to zero
+	
+	move $t7, $s7				#pointer
+	addu $t6, $s7, $s6 			#end point
+	zeroing_loop:
+	lbu $t4, 0($t7)
+	andi $t4, $t4, 0xFE			#and flag '1111_1110'
+	sb $t4, 0($t7)				# feel free to change the flag to see how that affects the image
+	addi $t7, $t7, 1
+	slt $t5, $t6, $t7
+	beqz $t5, zeroing_loop
+	
+	
+	
+	
+	
 	
 	
 userInputNewFileName:
