@@ -37,6 +37,11 @@ li $v0, 8
 syscall
 .end_macro
 
+.macro readc ()
+li $v0, 12
+syscall
+.end_macro
+
 .macro char (%char, %form)
 li $v0, 11
 %form ($a0, %char)

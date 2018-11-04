@@ -1,139 +1,222 @@
 ##############################
-#      Red Herring           #
+#      RGB Herring           #
 #                            #
 #      Matthew Sutton        #
 #       Calvin Crino         #
 #        James Bors          #
 #                            #
 ##############################
-#$S0 holds input file location
-#$S1 holds new file name. 
-#$S2 holds original picture data
+#$s0 holds active file location
+#$s1 holds active file pointer
+#$s2 holds input image header
+#$s3 holds input image pixel map, and then $s3 - 4 holds size of input image pixel map
+#$s4 holds message pointer
 
 .include "Macros.asm"
 
 .data
- keyQuestion: .asciiz "What is the key? "
- methodQuestion: .asciiz "What encoding method would you like to use? "
- rbgQuestion: .asciiz "Red, Green, or Blue? "
- fileLocation: .asciiz "Where is the picture located? "
- showFileLocation: .asciiz "You entered this file location:\n"
- hiddenMessage: .asciiz "Please provide the message to be hidden in the picture: "
- newFileName: .asciiz "Please provide a name for the new picture: "
- finString: .space 100
- foutString: .space 100
+ MainMenu: .asciiz "RGB Herring\n\nChoose an Operation:\n1). encode a message\n2). decode a message\n3). quit\n\n>"
+ InvalidInput: .asciiz "\nsorry response not expected\n\n" 
+ EncodeMenu: .asciiz "Choose an Encoding Method:\n1).simple LSB\n0). abort\n\n>"
+ DecodeMenu: .asciiz "Choose the Encoding key:\n1).simple LSB\n0). abort\n\n>"
+ ImageFilePrompt: .asciiz "Enter the full file path to the Bitmap:\nEx: C:\\Users\\JohnDoe\Pictures\toEncodeBitmap.bmp\n\n>"
+ InputMessage: .asciiz "Enter the message to encode:\n\tdoes not support newlines.\n\n>"
+ ExportFilePrompt: .asciiz "Enter the full file path for the generated Bitmap:\nEx: C:\\Users\\JohnDoe\Pictures\secretMessageBitmap.bmp\n\n>"
+ 
+ finString: .space 128
+ foutString: .space 128
  
 .text
 main:
+	tell (MainMenu, adr)
+	readc ()
+	li $t0, '1'
+	beq $v0, $t0, StartEncode
+	li $t0, '2'
+	beq $v0, $t0, StartDecode
+	li $t0, '3'
+	beq $v0, $t0, exit
+	tell (InvalidInput, adr)
+	j main
 
-userInputFileLocation:
-	# $s0 holds file location
+StartEncode:
+	# read in picture
+	jal ReadPicture
+	
+	# read in message
+	jal ReadMessage
+	
+	# prompt encoding options
+	EncodingInputLoop:
+	tell (EncodeMenu, adr)
+	readc ()
+	li $t0, '1'
+	bne $v0, $t0, EncodeSkip1
+	jal Encode1
+	j exitEncode
+	EncodeSkip1:
+	li $t0, '3'
+	beq $v0, $t0, main
+	tell (InvalidInput, adr)
+	j EncodingInputLoop
+	exitEncode:
+	
+	# write picture
+	jal WritePicture
+	
+	# return to main menu
+	j main
+	
+StartDecode:
+	# read in picture
+	jal ReadPicture
+	
+	# prompt decoding method
+	DecodingInputLoop:
+	tell (DecodeMenu, adr)
+	readc ()
+	li $t0, '1'
+	bne $v0, $t0, DecodeSkip1
+	jal Decode1
+	j exitDecode
+	DecodeSkip1:
+	li $t0, '3'
+	beq $v0, $t0, main
+	tell (InvalidInput, adr)
+	j DecodingInputLoop
+	exitDecode:
+	
+	# output message
+	
+	
+	# return to main menu
+	j main
 
-	tell (fileLocation, adr) 	#Ask user string
+ReadPicture:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
 	
-	la $s0, finString		#pointing s0 to finstring
-	listen ($s0, reg, 100, imd)	#reading user input
+	tell(ImageFilePrompt, adr)
 	
+	la $s0, finString
+	listen ($s0, reg, 128, imd)
 	
-	#Full disclosure, I got this loop from StackOverflow. We need to strip the newline chars that are added to inputs and this does the job.
-	xor $a2, $a2, $a2
-	loop:
-	lbu $a3, finString($a2)  
-	addiu $a2, $a2, 1
-	bnez $a3, loop      	  # Search the NULL char code
-   	beq $a1, $a2, skip   	  # Check whether the buffer was fully loaded
-	subiu $a2, $a2, 2   	  # Otherwise 'remove' the last character
-	sb $0, finString($a2)     # and put a NULL instead
-	skip:
-
-readPicture:
-	# $s2 holds old picture data
-	#open file 
-	openf ($s0, reg, READ)
-	move $s2, $v0
+	move $a0, $s0
+	jal SanitizeInput					# remove newline character
+	
+	openf ($s0, reg, READ)				# generates a file pointer
+	move $s1, $v0					# save to active file pointer register
 	
 	#allocate 56 bytes (header min size 54, padded by 2 for word align)
 	malloc (56, imd)
-	move $s3, $v0	# save allocated memory pointer
-	addi $s3, $s3, 2	# ignore padding bytes
-
+	move $s2, $v0					# save allocated memory pointer
+	addi $s2, $s2, 2					# ignore padding bytes
 	
-	#read from file
-	readf ($s2, reg, $s3, reg, 54, imd)
+	readf ($s1, reg, $s2, reg, 54, imd)		# header contents to header pointer
 	
-	#input validation
-	lhu $t1, 0($s3)				# load a half
-	li $t0,	0x00004d42			# load hex value of BM, remember edianess 
+	#input validation of Image file
+	lhu $t1, 0($s2)					# load a half
+	li $t0,	0x00004d42				# load hex value of BM, remember edianess 
 	bne $t1, $t0, exit
 	
-	lhu $t0, 28($s3)			# check for color depth 24
+	
+	# TO DO ADD DEPTH MANAGMENT
+	lhu $t0, 28($s2)					# check for color depth 24
 	li $t1, 24
-	bne $t1, $t0, exit			# if not, abort
+	bne $t1, $t0, exit				# if not, abort
 	
 	#calculate pixel map size
-	lw $t0, 2($s3) 				#load bytes in file
-	lw $t1, 10($s3)				#load bytes to pixel map
-	sub $s6, $t0, $t1			# bytes in file - bytes to map = bytes in map
+	lw $t0, 2($s2) 					#load bytes in file
+	uint ($t0, reg)
+	lw $t1, 10($s2)					#load bytes to pixel map
+	uint ($t1, reg)
+	sub $t3, $t0, $t1					# bytes in file - bytes to map = bytes in map
+	addi $s3, $t3, 4					# add space for size
+	uint ($s3, reg)
 	
 	# allocate space for map load
-	malloc ($s6, reg)
-	move $s7, $v0
+	malloc ($s3, reg)
+	move $s3, $v0					# $s3 is a space map size + 4 bytes
+	sw $t3, 0($s3)						# save map size to first 4 bytes
+	addi $s3, $s3, 4					# hide first 4 bytes for reading
 	
 	#read from file
-	readf ($s2, reg, $s7, reg, $s6, reg)	#pixel map now in memory
+	readf ($s1, reg, $s3, reg, $t3, reg)	# pixel map now in memory
 	
 	# Close the file 
-	closef ($s2, reg)
-	
-	# at this point we'll need the message to start encoding
-	# but in this instance im just going to over write the last bit of every byte to zero
-	
-	move $t7, $s7				#pointer
-	addu $t6, $s7, $s6 			#end point
-	zeroing_loop:
-	lbu $t4, 0($t7)
-	andi $t4, $t4, 0xFE			#and flag '1111_1110'
-	sb $t4, 0($t7)				# feel free to change the flag to see how that affects the image
-	addi $t7, $t7, 1
-	slt $t5, $t6, $t7
-	beqz $t5, zeroing_loop
+	closef ($s1, reg)					# deactivate file pointer
+	lw $ra 0($sp)
+	addi $sp, $sp, 4
+	jr $ra
 	
 	
 	
 	
+ReadMessage:	# TODO - add .txt file input, currently reads in at most 1024 characters from command line
+	
+	tell (InputMessage, adr)
+	
+	malloc (1024, imd)
+	move $s4, $v0
+	
+	listen ($s4, reg, 1024, imd)
+	jr $ra
+	
+	
+Encode1:
+	
+	jr $ra
 	
 	
 	
-userInputNewFileName:
-	# $s1 holds new file name
 	
-	tell (newFileName, adr)
+Decode1:
 	
-	la $s1, foutString
-	listen ($s1, reg, 100, imd)
+	jr $ra
 	
-	#Full disclosure, I got this loop from StackOverflow. We need to strip the newline chars that are added to inputs and this does the job.
-	xor $a2, $a2, $a2
-	loop2:
-	lbu $a3, foutString($a2)  
-   	addiu $a2, $a2, 1
-   	bnez $a3, loop2		# Search the NULL char code
-   	beq $a1, $a2, skip2   	# Check whether the buffer was fully loaded
-   	subiu $a2, $a2, 2   	# Otherwise 'remove' the last character
-   	sb $0, foutString($a2)  # and put a NULL instead
-	skip2:
+	
+	
+	
+WritePicture:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	tell (ExportFilePrompt, adr)
+	
+	la $s0, foutString
+	listen ($s0, reg, 100, imd)
+	
+	move $a0, $s0
+	jal SanitizeInput					# remove newline character
 
-	
-openNewFile:
 	#opens a new file with name given by user for writing
 	openf (foutString, adr, WRITE)
-	move $s2, $v0
+	move $s1, $v0
 	
 	#begin writing from pictureBuffer
-	writef ($s2, reg, $s3, reg, 54, imd)		#copy forward header
-	writef ($s2, reg, $s7, reg, $s6, reg)		#copy in edited pixel map
-	closef ($s2, reg)
+	writef ($s1, reg, $s2, reg, 54, imd)	# copy forward header
+	lw $t3, -4($s6)
+	writef ($s1, reg, $s3, reg, $t3, reg)	# copy in edited pixel map
+	closef ($s1, reg)
 	
+	lw $ra 0($sp)
+	addi $sp, $sp, 4
+	jr $ra
+
+SanitizeInput:
+	lbu $t0, 0($a0)
+	beqz $t0, nullReached
+	addi $a0, $a0, 1
+	j SanitizeInput
+	nullReached:
+	addi $a0, $a0, -1
+	lbu $t0, 0($a0)
+	li $t1, '\n'
+	bne $t0, $t1, notNewline
+	sb $zero, 0($a0)
+	notNewline:	
+	jr $ra
+
 exit:
 	li $v0, 10
 	syscall
