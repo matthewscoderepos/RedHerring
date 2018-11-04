@@ -11,18 +11,20 @@
 #$s2 holds input image header
 #$s3 holds input image pixel map, and then $s3 - 4 holds size of input image pixel map
 #$s4 holds message pointer
+#$s5 - $s7, reserved for encoding/decoding operations
 
 .include "Macros.asm"
 
 .data
- MainMenu: .asciiz "RGB Herring\n\nChoose an Operation:\n1). encode a message\n2). decode a message\n3). quit\n\n>"
+ MainMenu: .asciiz "\nRGB Herring\n\nChoose an Operation:\n1). encode a message\n2). decode a message\n3). quit\n\n>"
  InvalidInput: .asciiz "\nsorry response not expected\n\n" 
- EncodeMenu: .asciiz "Choose an Encoding Method:\n1).simple LSB\n0). abort\n\n>"
- DecodeMenu: .asciiz "Choose the Encoding key:\n1).simple LSB\n0). abort\n\n>"
- ImageFilePrompt: .asciiz "Enter the full file path to the Bitmap:\nEx: C:\\Users\\JohnDoe\Pictures\toEncodeBitmap.bmp\n\n>"
- InputMessage: .asciiz "Enter the message to encode:\n\tdoes not support newlines.\n\n>"
- ExportFilePrompt: .asciiz "Enter the full file path for the generated Bitmap:\nEx: C:\\Users\\JohnDoe\Pictures\secretMessageBitmap.bmp\n\n>"
- 
+ EncodeMenu: .asciiz "\nChoose an Encoding Method:\n1).simple LSB\n0). abort\n\n>"
+ DecodeMenu: .asciiz "\nChoose the Encoding key:\n1).simple LSB\n0). abort\n\n>"
+ ImageFilePrompt: .asciiz "\nEnter the full file path to the Bitmap:\nEx: C:\\Users\\JohnDoe\\Pictures\\toEncodeBitmap.bmp\n\n>"
+ InputMessage: .asciiz "\nEnter the message to encode:\n\tdoes not support newlines.\n\n>"
+ ExportFilePrompt: .asciiz "\nEnter the full file path for the generated Bitmap:\nEx: C:\\Users\\JohnDoe\\Pictures\\secretMessageBitmap.bmp\n\n>"
+ ImageEndOfFileE: .asciiz "\nWarning, message encoding terminated due to image End Of File\n"
+ ImageEndOfFileD: .asciiz "\nWarning, message decoding terminated without reaching null character\n"
  finString: .space 128
  foutString: .space 128
  
@@ -52,7 +54,7 @@ StartEncode:
 	readc ()
 	li $t0, '1'
 	bne $v0, $t0, EncodeSkip1
-	jal Encode1
+	jal EnSimpleLSB
 	j exitEncode
 	EncodeSkip1:
 	li $t0, '3'
@@ -77,7 +79,7 @@ StartDecode:
 	readc ()
 	li $t0, '1'
 	bne $v0, $t0, DecodeSkip1
-	jal Decode1
+	jal DeSimpleLSB
 	j exitDecode
 	DecodeSkip1:
 	li $t0, '3'
@@ -87,7 +89,9 @@ StartDecode:
 	exitDecode:
 	
 	# output message
-	
+	char ('\n', imd)
+	tell ($s4, reg)
+	char ('\n', imd)
 	
 	# return to main menu
 	j main
@@ -120,19 +124,16 @@ ReadPicture:
 	bne $t1, $t0, exit
 	
 	
-	# TO DO ADD DEPTH MANAGMENT
+	# TODO ADD DEPTH MANAGMENT
 	lhu $t0, 28($s2)					# check for color depth 24
 	li $t1, 24
 	bne $t1, $t0, exit				# if not, abort
 	
 	#calculate pixel map size
 	lw $t0, 2($s2) 					#load bytes in file
-	uint ($t0, reg)
 	lw $t1, 10($s2)					#load bytes to pixel map
-	uint ($t1, reg)
 	sub $t3, $t0, $t1					# bytes in file - bytes to map = bytes in map
 	addi $s3, $t3, 4					# add space for size
-	uint ($s3, reg)
 	
 	# allocate space for map load
 	malloc ($s3, reg)
@@ -163,15 +164,126 @@ ReadMessage:	# TODO - add .txt file input, currently reads in at most 1024 chara
 	jr $ra
 	
 	
-Encode1:
+EnSimpleLSB:
 	
+	
+	lw $s5, 18($s2)					# gets the width of pixel map in pixels
+	mul $s5, $s5, 3					# width of pixel map in bytes
+	move $s6, $s5					# copy of width
+	andi $t1, $s5, 0x00000003			# check if last 2 bits are not zero
+	beqz $t1, ESLSB_aligned				# this evalutates false if and only if the byte count is not divisible by 4
+	andi $s6, $s6, 0xfffffffc			# so then generated an adjusted width add padding until
+	addi $s6, $s6, 4					# it is divisible by 4
+	ESLSB_aligned:
+	lw $s7, 22($s2)					# gets the height of pixel map in pixels
+	slt $t0, $s7, $0
+	beqz $t0, ESLSB_posHeight
+	not $s7, $s7
+	addi $s7, $s7, 1
+	ESLSB_posHeight:
+	
+	move $t5, $0					# ending flag
+	move $t7, $0					# width index
+	move $t8, $0					# height index
+	ESLSB_nextByte:
+	lbu $t0, 0($s4)					# get next message byte
+	bnez $t5, ESLSB_Exit
+	bnez $t0, ESLSB_Cont				# check if message is fully encoded yet
+	addi $t5, $t5, 1
+	ESLSB_Cont:
+	addi $s4, $s4, 1
+	li $t9, 8						# message byte index, 8 bits left to encode
+	ESLSB_nextBit:
+	andi $t1, $t0, 1					# bit of message to append
+	mult $t8, $s6					# 
+	mflo $t6						#
+	addu $t6, $t6, $t7				#
+	addu $t6, $t6, $s3				# address of next channel to edit
+	lbu $t2, 0($t6)
+	andi $t2, $t2, 0xfe				# discard LSB
+	or $t2, $t2, $t1					# replace with message
+	sb $t2, 0($t6)
+	
+	add $t7, $t7, 1					# increment width index
+	bne $t7, $s5, ESLSB_wnRange			# check its still within range
+	add $t8, $t8, 1					# if not increment height index
+	beq $t8, $s7, ESLSB_imageEnd			# check if height within range
+	move $t7, $0					# reset width index
+	ESLSB_wnRange:
+	addi $t9, $t9, -1					# decrement byte index
+	beqz $t9, ESLSB_nextByte			# if 0 then get next byte else
+	srl $t0, $t0, 1
+	j ESLSB_nextBit					# get next bit
+	
+	ESLSB_imageEnd:
+	tell (ImageEndOfFileE, adr)
+	ESLSB_Exit:
 	jr $ra
 	
 	
 	
 	
-Decode1:
+DeSimpleLSB:
 	
+	lw $t0, -4($s3)					# get map size
+	div $t0, $t0, 8					# approximate max message size
+	addi $t0, $t0, 1					# pad 1
+	malloc ($t0, reg)					# 
+	move $s4, $v0					# move to message pointer
+	
+	lw $s5, 18($s2)					# gets the width of pixel map in pixels
+	li $t1, 3						# 3 bytes per pixel
+	mult $s5, $t1
+	mflo $s5						# width of pixel map in bytes
+	move $s6, $s5					# copy of width
+	andi $t1, $s5, 0x00000003			# check if last 2 bits are not zero
+	beqz $t1, DSLSB_aligned				# this evalutates true if and only if the byte count is not divisible by 4
+	andi $s6, $s6, 0xfffffffc			# so then generated an adjusted width add padding until
+	addi $s6, $s6, 4					# it is divisible by 4
+	DSLSB_aligned:
+	lw $s7, 22($s2)					# gets the height of pixel map in pixels
+	slt $t0, $s7, $0
+	beqz $t0, DSLSB_posHeight
+	not $s7, $s7
+	addi $s7, $s7, 1
+	DSLSB_posHeight:
+	
+	move $t5, $s4					# message index
+	move $t7, $0					# width index
+	move $t8, $0					# height index
+	j DSLSB_skipIn
+	DSLSB_nextByte: 
+	srl $t0, $t0, 1
+	sb $t0, 0($t5)
+	beqz $t0, DSLSB_Exit
+	add $t5, $t5, 1
+	DSLSB_skipIn:
+	move $t0, $0					# reset message byte
+	li $t9, 8						# message byte index, 8 bits left to decode
+	DSLSB_nextBit:
+	mul $t6, $t8, $s6					# 
+	addu $t6, $t6, $t7				#
+	addu $t6, $t6, $s3				# address of next channel to read
+	lbu $t1, 0($t6)
+	andi $t1, $t1, 1					# discard everything but LSB
+	sll $t1, $t1, 8
+	add $t0, $t0, $t1					# append LSB
+	
+	
+	add $t7, $t7, 1					# increment width index
+	bne $t7, $s5, DSLSB_wnRange			# check its still within range
+	add $t8, $t8, 1					# if not increment height index
+	beq $t8, $s7, DSLSB_imageEnd			# check if height within range
+	li $t7, 0						# reset width index
+	DSLSB_wnRange:
+	addi $t9, $t9, -1					# decrement byte index
+	beqz $t9, DSLSB_nextByte			# if 0 then get next byte else
+	srl $t0, $t0, 1
+	j DSLSB_nextBit					# get next bit
+	
+	DSLSB_imageEnd:
+	tell (ImageEndOfFileD, adr)
+	DSLSB_Exit:
 	jr $ra
 	
 	
@@ -195,7 +307,7 @@ WritePicture:
 	
 	#begin writing from pictureBuffer
 	writef ($s1, reg, $s2, reg, 54, imd)	# copy forward header
-	lw $t3, -4($s6)
+	lw $t3, -4($s3)
 	writef ($s1, reg, $s3, reg, $t3, reg)	# copy in edited pixel map
 	closef ($s1, reg)
 	
