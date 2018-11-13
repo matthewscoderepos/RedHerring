@@ -18,8 +18,8 @@
 .data
  MainMenu: .asciiz "\nRGB Herring\n\nChoose an Operation:\n1). encode a message\n2). decode a message\n3). quit\n\n>"
  InvalidInput: .asciiz "\nsorry response not expected\n\n" 
- EncodeMenu: .asciiz "\nChoose an Encoding Method:\n1).simple LSB\n2).monochrome LSB\n0). abort\n\n>"
- DecodeMenu: .asciiz "\nChoose the Encoding key:\n1).simple LSB\n2).monochrome LSB\n0). abort\n\n>"
+ EncodeMenu: .asciiz "\nChoose an Encoding Method:\n1).simple LSB\n2).monochrome LSB\n3).random monochrome LSB\n0). abort\n\n>"
+ DecodeMenu: .asciiz "\nChoose the Encoding key:\n1).simple LSB\n2).monochrome LSB\n3).random monochrome LSB\n0). abort\n\n>"
  ImageFilePrompt: .asciiz "\nEnter the full file path to the Bitmap:\nEx: C:\\Users\\JohnDoe\\Pictures\\toEncodeBitmap.bmp\n\n>"
  InputMessage: .asciiz "\nEnter the message to encode:\n\tdoes not support newlines.\n\n>"
  ExportFilePrompt: .asciiz "\nEnter the full file path for the generated Bitmap:\nEx: C:\\Users\\JohnDoe\\Pictures\\secretMessageBitmap.bmp\n\n>"
@@ -27,11 +27,7 @@
  ImageEndOfFileD: .asciiz "\nWarning, message decoding terminated without reaching null character\n"
  chooseColor: .asciiz "\nWhich color would you like to encode in? R, B, or G? (Single letter, Capitalized only)\n"
  rgbQuestion: .asciiz "\nWhich color was used? R, B, or G? (Single letter, Capitalized only.) "
- check: .asciiz "\nChecking Bounds" #Debugging
- modChecking: .asciiz "\nChecking mod" #Debugging
- writingBit: .asciiz "\n@CHANGED BIT@" #Debugging
- readingBit: .asciiz "\nReading a bit"
- skippedBit: .asciiz "\nSkipping reading a bit"
+ KeyMessage: .asciiz "\nEnter the secret key: \n\tdoes not support newlines.\n\n>"
  finString: .space 128
  foutString: .space 128
  
@@ -70,7 +66,12 @@ StartEncode:
     jal EnMonoLSB
     j exitEncode
 	EncodeSkip2:
-	li $t0, '3'
+    li $t0, '3'
+    bne $v0, $t0,EncodeSkip3
+    jal EnRandomMonoLSB
+    j exitEncode
+	EncodeSkip3:	
+	li $t0, '0'
 	beq $v0, $t0, main
 	tell (InvalidInput, adr)
 	j EncodingInputLoop
@@ -101,6 +102,11 @@ StartDecode:
 	j exitDecode
 	DecodeSkip2:
 	li $t0, '3'
+    bne $v0, $t0,DecodeSkip3
+    jal DeRandomMonoLSB
+    j exitDecode
+	DecodeSkip3:
+	li $t0, '0'
 	beq $v0, $t0, main
 	tell (InvalidInput, adr)
 	j DecodingInputLoop
@@ -181,7 +187,18 @@ ReadMessage:	# TODO - add .txt file input, currently reads in at most 1024 chara
 	listen ($s4, reg, 1024, imd)
 	jr $ra
 	
+ReadKey:
+
+	tell (KeyMessage, adr)
 	
+	malloc (1024, imd)
+	move $t8, $v0
+	
+	listen ($t8, reg, 1024, imd)
+
+	jr $ra
+
+
 EnSimpleLSB:
 	
 	
@@ -511,6 +528,219 @@ DeMonoLSB:
 	DMLSB_imageEnd:
 	tell (ImageEndOfFileD, adr)
 	DMLSB_Exit:
+	jr $ra
+
+EnRandomMonoLSB:
+
+	tell (KeyMessage, adr)
+	
+	malloc (1024, imd)
+	move $t8, $v0
+	
+	listen ($t8, reg, 1024, imd)
+
+	addi $t0, $t0, 0x0F
+	div $t8, $t0
+	mfhi $t8
+
+    #Seeding Random Number Generator
+	li $v0, 40 
+    move $a1, $t8
+    li $a0, 1 
+    syscall 
+
+
+    li $v0, 42
+    li $a0, 1
+    li $a1, 2
+    syscall     #generate a random number (0-2) based on given key
+    move $t9, $a0
+
+
+	move $t3, $0
+    beq	$t9, $t3, EndRandomRGB  #if t9 = 0, Red
+    addi $t3, $t3, 1
+    beq $t9, $t3, EndRandomRGB  #If t9 = 1, Blue
+    addi $t3, $t3, 1
+    beq $t9, $t3, EndRandomRGB  #If t9 = 2, Green
+
+	EndRandomRGB:
+
+	lw $s5, 18($s2)					# gets the width of pixel map in pixels
+	mul $s5, $s5, 3					# width of pixel map in bytes
+	move $s6, $s5					# copy of width
+	andi $t1, $s5, 0x00000003		# check if last 2 bits are not zero
+	beqz $t1, ERMLSB_aligned			# this evalutates false if and only if the byte count is not divisible by 4
+	andi $s6, $s6, 0xfffffffc		# so then generated an adjusted width add padding until
+	addi $s6, $s6, 4				# it is divisible by 4
+	ERMLSB_aligned:
+	lw $s7, 22($s2)					# gets the height of pixel map in pixels
+	slt $t0, $s7, $0
+	beqz $t0, ERMLSB_posHeight
+	not $s7, $s7
+	addi $s7, $s7, 1
+	ERMLSB_posHeight:
+	#Sets up the pixel array so that we can work on it. Pads width, sets the height to be positive
+
+	move $t5, $0					# ending flag
+	move $t7, $t3					# width index
+	move $t8, $0					# height index
+	#Sets t5, t7, and t8 to 0, all used for determining where we are in the pixel array
+
+	ERMLSB_nextByte:
+	lbu $t0, 0($s4)					# get next message byte
+	bnez $t5, ERMLSB_Exit
+	bnez $t0, ERMLSB_Cont			# check if message is fully encoded yet
+	addi $t5, $t5, 1
+	#Loads 8 bits (1 byte) of the message into t0. If this fails and t0 is set to 0, t5 is set to 1 and the loop will exit on the next iteration 
+
+	ERMLSB_Cont:
+	addi $s4, $s4, 1
+	li $t9, 8						# message byte index, 8 bits left to encode
+	#Moves the message pointer 1 byte forward because we loaded the byte already in the last loop, sets t9 to 8 (used to determine if we need to load another byte of message or not)
+
+
+	ERMLSB_nextBit:
+	andi $t1, $t0, 1				# bit of message to append
+	mult $t8, $s6					# 
+	mflo $t6						#
+	addu $t6, $t6, $t7				#
+	addu $t6, $t6, $s3				# address of next channel to edit
+	lbu $t2, 0($t6)					#loads the byte that we are changing into t2
+	andi $t2, $t2, 0xfe				# discard LSB
+	or $t2, $t2, $t1				# replace with message
+	sb $t2, 0($t6)					#stores the byte in question into t6
+	#Determines where in the pixel array we are at, loads the byte we are at and edits that byte to contain our message data
+
+
+	add $t7, $t7, 3					# increment width index
+	bne $t7, $s5, ERMLSB_wnRange		# check its still within range
+	add $t8, $t8, 1					# if not increment height index
+	beq $t8, $s7, ERMLSB_imageEnd	# check if height within range
+	move $t7, $t3					# reset width index
+	#Determines if we are at the end of a line, if we are it resets the width index and moves us down a row. If we drop off the end of the pixel array we are out of image data
+
+	ERMLSB_wnRange:
+	addi $t9, $t9, -1				# decrement byte index
+	beqz $t9, ERMLSB_nextByte		# if 0 then get next byte else
+	srl $t0, $t0, 1
+	j ERMLSB_nextBit					# get next bit
+	#Determines if we still have message data in our loaded byte, if we do not it loads a new byte and if we do it starts the message encode on the next bit
+
+	ERMLSB_imageEnd:
+	tell (ImageEndOfFileE, adr)
+	ERMLSB_Exit:
+	jr $ra
+
+DeRandomMonoLSB:
+	
+	tell (KeyMessage, adr)
+	
+	malloc (1024, imd)
+	move $t8, $v0
+	
+	listen ($t8, reg, 1024, imd)
+
+	addi $t0, $t0, 0x0F
+	div $t8, $t0
+	mfhi $t8
+	
+
+    #Seeding Random Number Generator
+	li $v0, 40 
+    move $a1, $t8
+    li $a0, 1 
+    syscall 
+
+
+    dRandomLoop:
+    li $v0, 42
+    li $a0, 1
+    li $a1, 2
+    syscall     #generate a random number (0-2) based on given key
+    move $t9, $a0
+
+
+	move $t3, $0
+    beq	$t9, $t3, dEndRandomRGB  #if t9 = 0, Red
+    addi $t3, $t3, 1
+    beq $t9, $t3, dEndRandomRGB  #If t9 = 1, Blue
+    addi $t3, $t3, 1
+    beq $t9, $t3, dEndRandomRGB  #If t9 = 2, Green
+    j dRandomLoop #This statement shouldnt ever execute
+
+	dEndRandomRGB:
+
+	lw $t0, -4($s3)					# get map size
+	div $t0, $t0, 8					# approximate max message size
+	addi $t0, $t0, 1				# pad 1
+	malloc ($t0, reg)				# 
+	move $s4, $v0					# move to message pointer
+	#allocates space for the encoded message
+	
+	lw $s5, 18($s2)					# gets the width of pixel map in pixels
+	li $t1, 3						# 3 bytes per pixel
+	mult $s5, $t1
+	mflo $s5						# width of pixel map in bytes
+	move $s6, $s5					# copy of width
+	andi $t1, $s5, 0x00000003		# check if last 2 bits are not zero
+	beqz $t1, DRMLSB_aligned			# this evalutates true if and only if the byte count is not divisible by 4
+	andi $s6, $s6, 0xfffffffc		# so then generated an adjusted width add padding until
+	addi $s6, $s6, 4				# it is divisible by 4
+	DRMLSB_aligned:
+	lw $s7, 22($s2)					# gets the height of pixel map in pixels
+	slt $t0, $s7, $0
+	beqz $t0, DRMLSB_posHeight
+	not $s7, $s7
+	addi $s7, $s7, 1
+	DRMLSB_posHeight:
+	#Sets up the pixel array so that we can work on it. Pads width, sets the height to be positive
+
+	move $t5, $s4					# message index
+	move $t7, $t3					# width index
+	move $t8, $0					# height index
+	j DRMLSB_skipIn
+	#Sets t5 to the message pointer
+
+	DRMLSB_nextByte: 
+	srl $t0, $t0, 1
+	sb $t0, 0($t5)
+	beqz $t0, DRMLSB_Exit
+	add $t5, $t5, 1
+	#shifts t0 to the left, stores t0 in t5 (the message), if t0 = 0, were done
+
+	DRMLSB_skipIn:
+	move $t0, $0					# reset message byte
+	li $t9, 8						# message byte index, 8 bits left to decode
+	#t0 = 0, bits we need to read = 8
+
+	DRMLSB_nextBit:
+	mul $t6, $t8, $s6				# 
+	addu $t6, $t6, $t7				#
+	addu $t6, $t6, $s3				# address of next channel to read
+	lbu $t1, 0($t6)					#loads a byte from t6 into t1
+	andi $t1, $t1, 1				# discard everything but LSB
+	sll $t1, $t1, 8					#shift t1 left 8 bits
+	add $t0, $t0, $t1				# append LSB
+	
+	#checkBounds
+	add $t7, $t7, 3					# increment width index
+	bne $t7, $s5, DRMLSB_wnRange		# check its still within range
+	add $t8, $t8, 1					# if not increment height index
+	beq $t8, $s7, DRMLSB_imageEnd	# check if height within range
+	move $t7, $t3						# reset width index
+	#Checking bounds, resets width and increases height when needed, if we drop off the image we end
+
+	DRMLSB_wnRange:
+	addi $t9, $t9, -1				# decrement byte index
+	beqz $t9, DRMLSB_nextByte		# if 0 then get next byte else
+	srl $t0, $t0, 1
+	j DRMLSB_nextBit					# get next bit
+	#if we have bits left to decode get the next bit, otherwise get the next byte 
+
+	DRMLSB_imageEnd:
+	tell (ImageEndOfFileD, adr)
+	DRMLSB_Exit:
 	jr $ra
 
 WritePicture:
