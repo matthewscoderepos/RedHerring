@@ -30,7 +30,9 @@
  ImageEndOfFileD: .asciiz "\nWarning, message decoding terminated without reaching null character\n"
  chooseColor: .asciiz "\nWhich color would you like to encode in? R, B, or G? (Single letter, Capitalized only)\n"
  rgbQuestion: .asciiz "\nWhich color was used? R, B, or G? (Single letter, Capitalized only.) "
- KeyMessage: .asciiz "\nEnter the secret key: \n\tdoes not support newlines.\n\n>"
+ pinMessage: .asciiz "\nEnter a pin to encode with (integer value greater than 100): \n\n>"
+ KeyMessage: .asciiz "\nEnter code: \n\n"
+
  finString: .space 128
  foutString: .space 128
  
