@@ -7,38 +7,29 @@
 .text
 EnKeyedMonoLSB:
 
-	tell (KeyMessage, adr)
-	
-	malloc (1024, imd)
-	move $t8, $v0
-	
-	listen ($t8, reg, 1024, imd)
+	tell (pinMessage, adr)
+	li $v0, 5
+	syscall
+	move $t4, $v0
 
-	addi $t0, $t0, 0x0F
-	div $t8, $t0
-	mfhi $t8
+	li $t2, 100
+	div $t3, $t4, $t2
 
     #Seeding Random Number Generator
 	li $v0, 40 
-    move $a1, $t8
-    li $a0, 1 
-    syscall 
+    move $a1, $t3
 
-
+    RandomLoop:
     li $v0, 42
-    li $a0, 1
-    li $a1, 2
+    li $a1, 3
     syscall     #generate a random number (0-2) based on given key
-    move $t9, $a0
-
-
-	move $t3, $0
-    beq	$t9, $t3, EndKeyedRGB  #if t9 = 0, Red
-    addi $t3, $t3, 1
-    beq $t9, $t3, EndKeyedRGB  #If t9 = 1, Blue
-    addi $t3, $t3, 1
-    beq $t9, $t3, EndKeyedRGB  #If t9 = 2, Green
-
+	addi $t3, $t3, -1
+	bne $t3, $0, RandomLoop
+    li $v0, 1
+	syscall
+	move $t4, $a0
+	li $v0, 1
+	syscall
 	EndKeyedRGB:
 
 	lw $s5, 18($s2)					# gets the width of pixel map in pixels
@@ -58,7 +49,7 @@ EnKeyedMonoLSB:
 	#Sets up the pixel array so that we can work on it. Pads width, sets the height to be positive
 
 	move $t5, $0					# ending flag
-	move $t7, $t3					# width index
+	move $t7, $t4					# width index
 	move $t8, $0					# height index
 	#Sets t5, t7, and t8 to 0, all used for determining where we are in the pixel array
 
@@ -92,7 +83,7 @@ EnKeyedMonoLSB:
 	bne $t7, $s5, EKMLSB_wnRange		# check its still within range
 	add $t8, $t8, 1					# if not increment height index
 	beq $t8, $s7, EKMLSB_imageEnd	# check if height within range
-	move $t7, $t3					# reset width index
+	move $t7, $t4					# reset width index
 	#Determines if we are at the end of a line, if we are it resets the width index and moves us down a row. If we drop off the end of the pixel array we are out of image data
 
 	EKMLSB_wnRange:
@@ -108,41 +99,30 @@ EnKeyedMonoLSB:
 	jr $ra
 
 DeKeyedMonoLSB:
-	
-	tell (KeyMessage, adr)
-	
-	malloc (1024, imd)
-	move $t8, $v0
-	
-	listen ($t8, reg, 1024, imd)
+	tell (KeyMessage, adr)	
+	li $v0, 5
+	syscall
+	move $t4, $v0
 
-	addi $t0, $t0, 0x0F
-	div $t8, $t0
-	mfhi $t8
-	
+	li $t2, 100
+	div $t3, $t4, $t2
 
     #Seeding Random Number Generator
 	li $v0, 40 
-    move $a1, $t8
-    li $a0, 1 
-    syscall 
+    move $a1, $t3
 
-
-    dKeyedLoop:
+    dRandomLoop:
     li $v0, 42
-    li $a0, 1
-    li $a1, 2
+    li $a1, 3
     syscall     #generate a random number (0-2) based on given key
-    move $t9, $a0
+	addi $t3, $t3, -1
+	bne $t3, $0, dRandomLoop
+    li $v0, 1
+	syscall
+	move $t4, $a0
+	li $v0, 1
+	syscall
 
-
-	move $t3, $0
-    beq	$t9, $t3, dEndKeyedRGB  #if t9 = 0, Red
-    addi $t3, $t3, 1
-    beq $t9, $t3, dEndKeyedRGB  #If t9 = 1, Blue
-    addi $t3, $t3, 1
-    beq $t9, $t3, dEndKeyedRGB  #If t9 = 2, Green
-    j dKeyedLoop #This statement shouldnt ever execute
 
 	dEndKeyedRGB:
 
@@ -172,7 +152,7 @@ DeKeyedMonoLSB:
 	#Sets up the pixel array so that we can work on it. Pads width, sets the height to be positive
 
 	move $t5, $s4					# message index
-	move $t7, $t3					# width index
+	move $t7, $t4					# width index
 	move $t8, $0					# height index
 	j DKMLSB_skipIn
 	#Sets t5 to the message pointer
@@ -203,7 +183,7 @@ DeKeyedMonoLSB:
 	bne $t7, $s5, DKMLSB_wnRange		# check its still within range
 	add $t8, $t8, 1					# if not increment height index
 	beq $t8, $s7, DKMLSB_imageEnd	# check if height within range
-	move $t7, $t3						# reset width index
+	move $t7, $t4						# reset width index
 	#Checking bounds, resets width and increases height when needed, if we drop off the image we end
 
 	DKMLSB_wnRange:
