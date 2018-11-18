@@ -14,9 +14,7 @@
 #$s5 - $s7, reserved for encoding/decoding operations
 
 .include "Macros.asm"
-.include "simpleLSB.asm"
-.include "monoLSB.asm"
-.include "keyMonoLSB.asm"
+
 
 .data
  MainMenu: .asciiz "\nRGB Herring\n\nChoose an Operation:\n1). encode a message\n2). decode a message\n3). quit\n\n>"
@@ -240,6 +238,11 @@ SanitizeInput:
 	sb $zero, 0($a0)
 	notNewline:	
 	jr $ra
+
+	.include "simplelSB.asm"
+	.include "monoLSB.asm"
+	.include "keyMonoLSB.asm"
+
 
 exit:
 	li $v0, 10
