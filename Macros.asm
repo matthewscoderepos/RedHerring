@@ -112,6 +112,15 @@ li $v0, 42
 syscall
 .end_macro
 
+.macro pushr (%value)
+addi $sp, $sp, -4
+sw %value, 0($sp)
+.end_macro
+
+.macro popr (%value)
+lw %value 0($sp)
+addi $sp, $sp, 4
+.end_macro ()
 
 
 
