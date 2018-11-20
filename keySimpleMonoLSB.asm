@@ -1,7 +1,7 @@
 # # # # # # # # # # # # # # # # #
-#     Keyed Simple Monochrome LSB	#
-#				#
-#				#
+#  Keyed Simple Monochrome LSB	#
+#								#
+#								#
 # # # # # # # # # # # # # # # # #
 
 .text
@@ -16,16 +16,11 @@ EnKeyedSimpleMonoLSB:
 	addu $t0, $t0, $t1				#sum values
 	seedrand (0, imd, $t0, reg)			#seed id 0 rand to key
 
-    sRandomLoop:
     li $v0, 42
+	li $a0, 0
     li $a1, 3
     syscall     #generate a random number (0-2) based on given key
-	addi $t3, $t3, -1
-	bne $t3, $0, sRandomLoop
-
 	move $t4, $a0
-
-	EndKeyedRGB:
 
 	lw $s5, 18($s2)					# gets the width of pixel map in pixels
 	mul $s5, $s5, 3					# width of pixel map in bytes
@@ -104,14 +99,10 @@ DeKeyedSimpleMonoLSB:
 	addu $t0, $t0, $t1				#sum values
 	seedrand (0, imd, $t0, reg)			#seed id 0 rand to key
 
-    dsRandomLoop:
     li $v0, 42
+	li $a0, 0
     li $a1, 3
     syscall     #generate a random number (0-2) based on given key
-	addi $t3, $t3, -1
-	bne $t3, $0, dsRandomLoop
-	move $t4, $a0
-	dEndKeyedRGB:
 
 	lw $t0, -4($s3)					# get map size
 	div $t0, $t0, 8					# approximate max message size

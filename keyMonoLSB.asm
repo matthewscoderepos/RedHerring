@@ -1,7 +1,7 @@
 # # # # # # # # # # # # # # # # #
-#     Keyed Monochrome LSB	#
-#				#
-#				#
+#     Keyed Monochrome LSB		#
+#								#
+#								#
 # # # # # # # # # # # # # # # # #
 
 .text
@@ -73,13 +73,7 @@ EnKeyedMonoLSB:
 	sb $t2, 0($t6)					#stores the byte in question into t6
 	#Determines where in the pixel array we are at, loads the byte we are at and edits that byte to contain our message data
 
-##################################
-	#addi $t3, $0, 3 				#loads 3 into t3
-	#sub $t3, $t3, $t4 				#stores 3-t4 into t3
-	#add $t7, $t7, $t3				# increment width index by 3-t4, which should put it at the start of the next pixel
 	add $t7, $t7, 3
-##################################
-
 	bne $t7, $s5, EKMLSB_wnRange		# check its still within range
 	add $t8, $t8, 1					# if not increment height index
 	beq $t8, $s7, EKMLSB_imageEnd	# check if height within range
@@ -173,14 +167,7 @@ DeKeyedMonoLSB:
 	add $t0, $t0, $t1				# append LSB
 	
 
-	########################
-	#checkBounds
-	#addi $t3, $0, 3 				#loads 3 into t3
-	#sub $t3, $t3, $t4 				#stores 3-t4 into t3	
-	#add $t7, $t7, $t3				# increment width index by 3-t4, which should put it at the start of the next pixel
 	add $t7, $t7, 3
-
-	#########################
 	bne $t7, $s5, DKMLSB_wnRange	# check its still within range
 	add $t8, $t8, 1					# if not increment height index
 	beq $t8, $s7, DKMLSB_imageEnd	# check if height within range
