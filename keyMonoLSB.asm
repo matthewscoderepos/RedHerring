@@ -14,6 +14,7 @@ EnKeyedMonoLSB:
 
     #Seeding Random Number Generator
 	li $v0, 40 
+	move $a0, $0
     move $a1, $t4
 	syscall
 
@@ -55,6 +56,7 @@ EnKeyedMonoLSB:
 	EKMLSB_nextBit:
 
     li $v0, 42
+	move $a0, $0
     li $a1, 3
     syscall     #generate a random number (0-2) based on given key
 	move $t4, $a0
@@ -102,6 +104,7 @@ DeKeyedMonoLSB:
 
     #Seeding Random Number Generator
 	li $v0, 40 
+	move $a0, $0
     move $a1, $t4
 	syscall
 
@@ -153,6 +156,7 @@ DeKeyedMonoLSB:
 	DKMLSB_nextBit:
 
     li $v0, 42
+	move $a0, $0
     li $a1, 3
     syscall     #generate a random number (0-2) based on given key
 	move $t4, $a0
