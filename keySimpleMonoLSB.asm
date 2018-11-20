@@ -7,18 +7,14 @@
 .text
 EnKeyedSimpleMonoLSB:
 
-	tell (pinMessage, adr)
-	li $v0, 5
-	syscall
-	move $t4, $v0
-
-	li $t2, 100
-	div $t3, $t4, $t2
-
-    #Seeding Random Number Generator
-	li $v0, 40 
-    move $a1, $t3
-	syscall
+	tell (KeyMessage, adr)				# ask for key
+	malloc (9, imd)
+	move $t0, $v0
+	listen ($t0, reg, 9, imd)			# listen to key
+	lw $t1, 0($t0)					#load first 4 characters
+	lw $t0, 4($t0)					#load second 4 characters
+	addu $t0, $t0, $t1				#sum values
+	seedrand (0, imd, $t0, reg)			#seed id 0 rand to key
 
     sRandomLoop:
     li $v0, 42
@@ -99,18 +95,14 @@ EnKeyedSimpleMonoLSB:
 
 DeKeyedSimpleMonoLSB:
 	
-	tell (KeyMessage, adr)	
-	li $v0, 5
-	syscall
-	move $t4, $v0
-
-	li $t2, 100
-	div $t3, $t4, $t2
-
-    #Seeding Random Number Generator
-	li $v0, 40 
-    move $a1, $t3
-	syscall
+	tell (KeyMessage, adr)				# ask for key
+	malloc (9, imd)
+	move $t0, $v0
+	listen ($t0, reg, 9, imd)			# listen to key
+	lw $t1, 0($t0)					#load first 4 characters
+	lw $t0, 4($t0)					#load second 4 characters
+	addu $t0, $t0, $t1				#sum values
+	seedrand (0, imd, $t0, reg)			#seed id 0 rand to key
 
     dsRandomLoop:
     li $v0, 42

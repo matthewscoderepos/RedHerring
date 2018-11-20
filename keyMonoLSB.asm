@@ -7,16 +7,15 @@
 .text
 EnKeyedMonoLSB:
 
-	tell (pinMessage, adr)
-	li $v0, 5
-	syscall
-	move $t4, $v0
-
     #Seeding Random Number Generator
-	li $v0, 40 
-	move $a0, $0
-    move $a1, $t4
-	syscall
+	tell (KeyMessage, adr)				# ask for key
+	malloc (9, imd)
+	move $t0, $v0
+	listen ($t0, reg, 9, imd)			# listen to key
+	lw $t1, 0($t0)					#load first 4 characters
+	lw $t0, 4($t0)					#load second 4 characters
+	addu $t0, $t0, $t1				#sum values
+	seedrand (0, imd, $t0, reg)			#seed id 0 rand to key
 
 	EndMKeyedRGB:
 
@@ -57,15 +56,16 @@ EnKeyedMonoLSB:
 
     li $v0, 42
 	move $a0, $0
-    li $a1, 3
+    li $a1, 2
     syscall     #generate a random number (0-2) based on given key
 	move $t4, $a0
-	add $t7, $t7, $t4
+	move $t3, $t7
+	add $t3, $t3, $t4
 
 	andi $t1, $t0, 1				# bit of message to append
 	mult $t8, $s6					# 
 	mflo $t6						#
-	addu $t6, $t6, $t7				#
+	addu $t6, $t6, $t3				#
 	addu $t6, $t6, $s3				# address of next channel to edit
 	lbu $t2, 0($t6)					#loads the byte that we are changing into t2
 	andi $t2, $t2, 0xfe				# discard LSB
@@ -73,14 +73,17 @@ EnKeyedMonoLSB:
 	sb $t2, 0($t6)					#stores the byte in question into t6
 	#Determines where in the pixel array we are at, loads the byte we are at and edits that byte to contain our message data
 
-	addi $t3, $0, 3 				#loads 3 into t3
-	sub $t3, $t3, $t4 				#stores 3-t4 into t3
-	add $t7, $t7, $t3				# increment width index by 3-t4, which should put it at the start of the next pixel
+##################################
+	#addi $t3, $0, 3 				#loads 3 into t3
+	#sub $t3, $t3, $t4 				#stores 3-t4 into t3
+	#add $t7, $t7, $t3				# increment width index by 3-t4, which should put it at the start of the next pixel
+	add $t7, $t7, 3
+##################################
 
 	bne $t7, $s5, EKMLSB_wnRange		# check its still within range
 	add $t8, $t8, 1					# if not increment height index
 	beq $t8, $s7, EKMLSB_imageEnd	# check if height within range
-	move $t7, $t3					# reset width index
+	move $t7, $0					# reset width index
 	#Determines if we are at the end of a line, if we are it resets the width index and moves us down a row. If we drop off the end of the pixel array we are out of image data
 
 	EKMLSB_wnRange:
@@ -97,16 +100,14 @@ EnKeyedMonoLSB:
 
 DeKeyedMonoLSB:
 	
-	tell (KeyMessage, adr)	
-	li $v0, 5
-	syscall
-	move $t4, $v0
-
-    #Seeding Random Number Generator
-	li $v0, 40 
-	move $a0, $0
-    move $a1, $t4
-	syscall
+	tell (KeyMessage, adr)				# ask for key
+	malloc (9, imd)
+	move $t0, $v0
+	listen ($t0, reg, 9, imd)			# listen to key
+	lw $t1, 0($t0)					#load first 4 characters
+	lw $t0, 4($t0)					#load second 4 characters
+	addu $t0, $t0, $t1				#sum values
+	seedrand (0, imd, $t0, reg)			#seed id 0 rand to key
 
 
 
@@ -157,23 +158,29 @@ DeKeyedMonoLSB:
 
     li $v0, 42
 	move $a0, $0
-    li $a1, 3
+    li $a1, 2
     syscall     #generate a random number (0-2) based on given key
 	move $t4, $a0
-	add $t7, $t7, $t4
+	move $t3, $t7
+	add $t3, $t3, $t4
 
 	mul $t6, $t8, $s6				# 
-	addu $t6, $t6, $t7				#
+	addu $t6, $t6, $t3				#
 	addu $t6, $t6, $s3				# address of next channel to read
 	lbu $t1, 0($t6)					#loads a byte from t6 into t1
 	andi $t1, $t1, 1				# discard everything but LSB
 	sll $t1, $t1, 8					#shift t1 left 8 bits
 	add $t0, $t0, $t1				# append LSB
 	
+
+	########################
 	#checkBounds
-	addi $t3, $0, 3 				#loads 3 into t3
-	sub $t3, $t3, $t4 				#stores 3-t4 into t3	
-	add $t7, $t7, $t3				# increment width index by 3-t4, which should put it at the start of the next pixel
+	#addi $t3, $0, 3 				#loads 3 into t3
+	#sub $t3, $t3, $t4 				#stores 3-t4 into t3	
+	#add $t7, $t7, $t3				# increment width index by 3-t4, which should put it at the start of the next pixel
+	add $t7, $t7, 3
+
+	#########################
 	bne $t7, $s5, DKMLSB_wnRange	# check its still within range
 	add $t8, $t8, 1					# if not increment height index
 	beq $t8, $s7, DKMLSB_imageEnd	# check if height within range
