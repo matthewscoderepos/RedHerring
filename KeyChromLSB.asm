@@ -7,14 +7,14 @@
 .text
 EnKeyedChromLSB:
 	
-	push ($s0)					#make extra register space
-	push ($s1)
-	push ($ra)
+	pushr ($s0)					#make extra register space
+	pushr ($s1)
+	pushr ($ra)
 	
 	tell (KeyMessage, adr)				# ask for key
-	malloc (8, imd)
+	malloc (9, imd)
 	move $t0, $v0
-	listen ($t0, reg, 8, imd)			# listen to key
+	listen ($t0, reg, 9, imd)			# listen to key
 	lw $t1, 0($t0)					#load first 4 characters
 	lw $t0, 4($t0)					#load second 4 characters
 	addu $t0, $t0, $t1				#sum values
@@ -147,7 +147,7 @@ EnKeyedChromLSB:
 	popr ($s1)
 	popr ($s0)
 	
-	j $ra
+	jr $ra
 
 EKCLSB_getnextbit:
 	bne $t9, 0 EKCLSB_bitsleft			# check if there are more bits left in the byte
@@ -164,12 +164,25 @@ EKCLSB_getnextbit:
 	andi $t1, $t0, 1				# bit of message to append	
 	addi $t9, $t9, -1				# decrement byte index
 	srl $t0, $t0, 1
-	j $ra
+	jr $ra
 
 
 
 
 DeKeyedChromLSB:
+	
+	pushr ($s0)					#make extra register space
+	pushr ($s1)
+	pushr ($ra)
+	
+	tell (KeyMessage, adr)				# ask for key
+	malloc (9, imd)
+	move $t0, $v0
+	listen ($t0, reg, 9, imd)			# listen to key
+	lw $t1, 0($t0)					#load first 4 characters
+	lw $t0, 4($t0)					#load second 4 characters
+	addu $t0, $t0, $t1				#sum values
+	seedrand (0, imd, $t0, reg)			#seed id 0 rand to key
 	
 	lw $t0, -4($s3)					# get map size
 	div $t0, $t0, 8					# approximate max message size
@@ -199,32 +212,87 @@ DeKeyedChromLSB:
 	move $t5, $s4					# message index
 	move $t7, $0					# width index
 	move $t8, $0					# height index
-	j DKCLSB_skipIn
-	#Sets t5 to the message pointer
-
-	DKCLSB_nextByte: 
-	srl $t0, $t0, 1
-	sb $t0, 0($t5)
-	beqz $t0, DKCLSB_Exit
-	add $t5, $t5, 1
-	#shifts t0 to the left, stores t0 in t5 (the message), if t0 = 0, were done
-
-	DKCLSB_skipIn:
-	move $t0, $0					# reset message byte
-	li $t9, 8						# message byte index, 8 bits left to decode
-	#t0 = 0, bits we need to read = 8
-
-	DKCLSB_nextBit:
+	li $t9, 8					# byte index
+	
+	DKCLSB_nextpix:
+	randomIntRange (0, imd, 5, imd)
+	bne $a0, $0, DKCLSB_skip1	# rand = 0 then
+	li $a0, 0xE4			# rand = RGB, 11-10-01-00
+	j DKCLSB_nextpix2
+	DKCLSB_skip1:
+	addi $a0, $a0, -1
+	bne $a0, $0, DKCLSB_skip2	# rand = 1 then
+	li $a0, 0xD2			# rand = RBG, 11-01-00-10
+	j DKCLSB_nextpix2
+	DKCLSB_skip2:
+	addi $a0, $a0, -1
+	bne $a0, $0, DKCLSB_skip3	# rand = 2 then
+	li $a0, 0x9C			# rand = GRB, 10-01-11-00
+	j DKCLSB_nextpix2
+	DKCLSB_skip3:
+	addi $a0, $a0, -1
+	bne $a0, $0, DKCLSB_skip4	# rand = 3 then
+	li $a0, 0x87			# rand = GBR, 10-00-01-11
+	j DKCLSB_nextpix2
+	DKCLSB_skip4:
+	addi $a0, $a0, -1
+	bne $a0, $0, DKCLSB_skip5	# rand = 4 then
+	li $a0, 0x63			# rand = BRG, 01-10-00-11
+	j DKCLSB_nextpix2
+	DKCLSB_skip5:			# rand = 5 so
+	li $a0, 0x4E			# rand = BGR, 01-00-11-10
+	DKCLSB_nextpix2:
 	mul $t6, $t8, $s6				# 
 	addu $t6, $t6, $t7				#
-	addu $t6, $t6, $s3				# address of next channel to read
-	lbu $t1, 0($t6)					#loads a byte from t6 into t1
-	andi $t1, $t1, 1				# discard everything but LSB
-	sll $t1, $t1, 8					#shift t1 left 8 bits
-	add $t0, $t0, $t1				# append LSB
+	addu $t6, $t6, $s3
 	
-	#checkBounds
-	add $t7, $t7, 1					# increment width index
+	andi $a1, $a0, 0xC0
+	sra $a1, $a1, 6
+	addi $a1, $a1, -1
+	beq $a1, $0, DKCLSB_Blue
+	addi $a1, $a1, -1
+	beq $a1, $0, DKCLSB_Green
+	j DKCLSB_Red
+	
+	DKCLSB_Blue:
+	lbu $t2, 2($t6)					#loads the byte that we are changing into t2
+	andi $t2, $t2, 0x01				# discard LSB
+	jal DKCLSB_bitout
+	
+	andi $a1, $a0, 0x03
+	beq $a1, $0, DKCLSB_pixend
+	addi $a1, $a1, -2
+	beq $a1, $0, DKCLSB_Green
+	j DKCLSB_Red
+	
+
+	DKCLSB_Green:
+	lbu $t2, 1($t6)					#loads the byte that we are changing into t2
+	andi $t2, $t2, 0x01				# discard LSB
+	jal DKCLSB_bitout
+	
+	andi $a1, $a0, 0x0C
+	sra $a1, $a1, 2
+	beq $a1, $0, DKCLSB_pixend
+	addi $a1, $a1, -1
+	beq $a1, $0, DKCLSB_Blue
+	j DKCLSB_Red
+	
+	
+	DKCLSB_Red:
+	lbu $t2, 0($t6)					#loads the byte that we are changing into t2
+	andi $t2, $t2, 0x01				# discard LSB
+	jal DKCLSB_bitout
+	
+	andi $a1, $a0, 0x30
+	sra $a1, $a1, 4
+	beq $a1, $0, DKCLSB_pixend
+	addi $a1, $a1, -1
+	beq $a1, $0, DKCLSB_Blue
+	j DKCLSB_Green
+	
+	DKCLSB_pixend:
+	add $t7, $t7, 3					# increment width index
 	bne $t7, $s5, DKCLSB_wnRange		# check its still within range
 	add $t8, $t8, 1					# if not increment height index
 	beq $t8, $s7, DKCLSB_imageEnd	# check if height within range
@@ -232,13 +300,27 @@ DeKeyedChromLSB:
 	#Checking bounds, resets width and increases height when needed, if we drop off the image we end
 
 	DKCLSB_wnRange:
-	addi $t9, $t9, -1				# decrement byte index
-	beqz $t9, DKCLSB_nextByte		# if 0 then get next byte else
-	srl $t0, $t0, 1
-	j DKCLSB_nextBit					# get next bit
-	#if we have bits left to decode get the next bit, otherwise get the next byte 
-
+	j DKCLSB_nextpix
+	
 	DKCLSB_imageEnd:
 	tell (ImageEndOfFileD, adr)
 	DKCLSB_Exit:
-	j $ra
+	popr($ra)
+	popr($s1)
+	popr($s0)
+	jr $ra
+	
+DKCLSB_bitout:
+	sll $t2, $t2, 8
+	add $t0, $t0, $t2
+	addi $t9, $t9, -1				# decrement byte index
+	srl $t0, $t0, 1
+	bnez $t9, DKCLSB_partialbyte
+	sb $t0, 0($t5)
+	beqz $t0, DKCLSB_Exit
+	add $t5, $t5, 1
+	li $t0, 0
+	li $t9, 8
+	DKCLSB_partialbyte:
+	jr $ra
+	

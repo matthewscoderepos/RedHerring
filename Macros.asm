@@ -120,7 +120,7 @@ sw %value, 0($sp)
 .macro popr (%value)
 lw %value 0($sp)
 addi $sp, $sp, 4
-.end_macro ()
+.end_macro
 
 
 
