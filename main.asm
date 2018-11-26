@@ -29,6 +29,7 @@
  chooseColor: .asciiz "\nWhich color would you like to encode in? R, B, or G? (Single letter, Capitalized only)\n"
  rgbQuestion: .asciiz "\nWhich color was used? R, B, or G? (Single letter, Capitalized only.) "
  KeyMessage: .asciiz "\nEnter the key: \n\tMax 8 characters ex: \"ApplePie\".\n\n>"
+ depthError: .asciiz "\nOnly BMP's of color depth 24 may be used for encoding/decoding purposes. Please try again with a different file.\n"
  finString: .space 128
  foutString: .space 128
  
@@ -161,11 +162,14 @@ ReadPicture:
 	bne $t1, $t0, exit
 	
 	
-	# TODO ADD DEPTH MANAGMENT
+	#Added simple depth managment, just checks if 24 
 	lhu $t0, 28($s2)					# check for color depth 24
 	li $t1, 24
-	bne $t1, $t0, exit				# if not, abort
-	
+	beq $t1, $t0, Cont				# if not, abort
+	tell(depthError, adr)
+	j main
+
+	Cont:
 	#calculate pixel map size
 	lw $t0, 2($s2) 					#load bytes in file
 	lw $t1, 10($s2)					#load bytes to pixel map
