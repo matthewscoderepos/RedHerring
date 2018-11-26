@@ -19,8 +19,8 @@
 .data
  MainMenu: .asciiz "\nRGB Herring\n\nChoose an Operation:\n1). encode a message\n2). decode a message\n3). quit\n\n>"
  InvalidInput: .asciiz "\nsorry response not expected\n\n" 
- EncodeMenu: .asciiz "\nChoose an Encoding Method:\n1).simple LSB\n2).monochrome LSB\n3).simple keyed monochrome LSB\n4).keyed monochrome LSB\n5).keyed chromatic LSB\n0). abort\n\n>"
- DecodeMenu: .asciiz "\nChoose the Encoding key:\n1).simple LSB\n2).monochrome LSB\n3).simple keyed monochrome LSB\n4).keyed monochrome LSB\n5).keyed chromatic LSB\n0). abort\n\n>"
+ EncodeMenu: .asciiz "\nChoose an Encoding Method:\n1).chromatic LSB\n\t\tUse each bit in order to store the message.\n\t\tVery insecure.\n2).monochrome LSB\n\t\tPick a color: red, green, or blue\n\t\tEncodes the message in just that color's channel. \n\t\tMore secure than simple LSB.\n3).keyed monochrome LSB\n\t\tProvide a key and the program will randomly select a single color\n\t\tfrom each pixel to store the message in.\n\t\tMuch more secure than simple LSB.\n4).keyed chromatic LSB\n\t\tProvide a key and the program will randomly select an encoding sequence in each pixel.\n\t\tVery secure. More secure than all other options.\n0). abort\n\n>"
+ DecodeMenu: .asciiz "\nChoose the Encoding key:\n1).chromatic LSB\n2).monochrome LSB\n3).keyed monochrome LSB\n4).keyed chromatic LSB\n0). abort\n\n>"
  ImageFilePrompt: .asciiz "\nEnter the full file path to the Bitmap:\nEx: C:\\Users\\JohnDoe\\Pictures\\toEncodeBitmap.bmp\n\n>"
  InputMessage: .asciiz "\nEnter the message to encode:\n\tdoes not support newlines.\n\n>"
  ExportFilePrompt: .asciiz "\nEnter the full file path for the generated Bitmap:\nEx: C:\\Users\\JohnDoe\\Pictures\\secretMessageBitmap.bmp\n\n>"
@@ -68,21 +68,16 @@ StartEncode:
     	jal EnMonoLSB
     	j exitEncode	
 	EncodeSkip2:
-    	li $t0, '3'
+		li $t0, '3'
     	bne $v0, $t0,EncodeSkip3
-    	jal EnKeyedSimpleMonoLSB
-    	j exitEncode
-	EncodeSkip3:
-		li $t0, '4'
-    	bne $v0, $t0,EncodeSkip4
     	jal EnKeyedMonoLSB
     	j exitEncode
-	EncodeSkip4:	
-		li $t0, '5'
-    	bne $v0, $t0,EncodeSkip5
+	EncodeSkip3:	
+		li $t0, '4'
+    	bne $v0, $t0,EncodeSkip4
     	jal EnKeyedChromLSB
     	j exitEncode
-	EncodeSkip5:	
+	EncodeSkip4:	
 		li $t0, '0'
 		beq $v0, $t0, main
 		tell (InvalidInput, adr)
@@ -115,20 +110,15 @@ StartDecode:
 		j exitDecode
 	DecodeSkip2:
 		li $t0, '3'
-		bne $v0, $t0, DecodeSkip3
-		jal DeKeyedSimpleMonoLSB
-		j exitDecode		
+    	bne $v0, $t0,DecodeSkip3
+    	jal DeKeyedMonoLSB
+    	j exitDecode
 	DecodeSkip3:
 		li $t0, '4'
     	bne $v0, $t0,DecodeSkip4
-    	jal DeKeyedMonoLSB
-    	j exitDecode
-	DecodeSkip4:
-		li $t0, '5'
-    	bne $v0, $t0,DecodeSkip5
     	jal DeKeyedChromLSB
     	j exitDecode
-	DecodeSkip5:
+	DecodeSkip4:
 		li $t0, '0'
 		beq $v0, $t0, main
 		tell (InvalidInput, adr)
