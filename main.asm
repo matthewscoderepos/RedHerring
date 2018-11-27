@@ -198,22 +198,12 @@ ReadMessage:	# TODO - add .txt file input, currently reads in at most 1024 chara
 	
 	tell (InputMessage, adr)
 	
-	malloc (1024, imd)
+	malloc (65536, imd)
 	move $s4, $v0
 	
-	listen ($s4, reg, 1024, imd)
+	listen ($s4, reg, 65536, imd)
 	jr $ra
-	
-ReadKey:
 
-	tell (KeyMessage, adr)
-	
-	malloc (1024, imd)
-	move $t8, $v0
-	
-	listen ($t8, reg, 1024, imd)
-
-	jr $ra
 
 WritePicture:
 	addi $sp, $sp, -4
