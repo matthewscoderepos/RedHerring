@@ -19,7 +19,7 @@
 .data
  MainMenu: .asciiz "\nRGB Herring\n\nChoose an Operation:\n1). encode a message\n2). decode a message\n3). quit\n\n>"
  InvalidInput: .asciiz "\nsorry response not expected\n\n" 
- EncodeMenu: .asciiz "\nChoose an Encoding Method:\n1).chromatic LSB\n\t\tUse each bit in order to store the message.\n\t\tVery insecure.\n2).monochrome LSB\n\t\tPick a color: red, green, or blue\n\t\tEncodes the message in just that color's channel. \n\t\tMore secure than simple LSB.\n3).keyed monochrome LSB\n\t\tProvide a key and the program will randomly select a single color\n\t\tfrom each pixel to store the message in.\n\t\tMuch more secure than simple LSB.\n4).keyed chromatic LSB\n\t\tProvide a key and the program will randomly select an encoding sequence in each pixel.\n\t\tVery secure. More secure than all other options.\n0). abort\n\n>"
+ EncodeMenu: .asciiz "\nChoose an Encoding Method:\n1).chromatic LSB\n\t\tUse each bit in order to store the message.\n\t\tVery insecure.\n2).monochrome LSB\n\t\tPick a color: red, green, or blue\n\t\tEncodes the message in just that color's channel. \n\t\tMore secure than Chromatic LSB.\n3).keyed monochrome LSB\n\t\tProvide a key and the program will randomly select a single color\n\t\tfrom each pixel to store the message in.\n\t\tMuch more secure than chromatic LSB.\n4).keyed chromatic LSB\n\t\tProvide a key and the program will randomly select an encoding sequence in each pixel.\n\t\tVery secure. More secure than all other options.\n0). abort\n\n>"
  DecodeMenu: .asciiz "\nChoose the Encoding key:\n1).chromatic LSB\n2).monochrome LSB\n3).keyed monochrome LSB\n4).keyed chromatic LSB\n0). abort\n\n>"
  ImageFilePrompt: .asciiz "\nEnter the full file path to the Bitmap:\nEx: C:\\Users\\JohnDoe\\Pictures\\toEncodeBitmap.bmp\n\n>"
  InputMessage: .asciiz "\nEnter the message to encode:\n\tdoes not support newlines.\n\n>"
@@ -61,7 +61,7 @@ StartEncode:
 	EncodeSkip:
 		li $t0, '1'
 		bne $v0, $t0, EncodeSkip1
-		jal EnSimpleLSB
+		jal EnChromaticLSB
 		j exitEncode
 	EncodeSkip1:
     	li $t0, '2'
@@ -102,7 +102,7 @@ StartDecode:
 	DecodeSkip:
 		li $t0, '1'
 		bne $v0, $t0, DecodeSkip1
-		jal DeSimpleLSB
+		jal DeChromaticLSB
 		j exitDecode
 	DecodeSkip1:
 		li $t0, '2'
@@ -245,11 +245,10 @@ SanitizeInput:
 	notNewline:	
 	jr $ra
 
-	.include "simplelSB.asm"
+	.include "chromaticlSB.asm"
 	.include "monoLSB.asm"
 	.include "keyMonoLSB.asm"
 	.include "keyChromLSB.asm"
-	#.include "keySimpleMonoLSB.asm"
 
 
 exit:

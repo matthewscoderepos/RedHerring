@@ -2,6 +2,8 @@
 #  Macros for use in RGB herring  #
 # # # # # # # # # # # # # # # # # #
 #
+#	by: calvin crino
+#
 # Macros for syscalls take the general form
 # name_of_syscall (value_a0, type_a0, value_a1, type_a1, . . .)
 #	type is either reg (register), imd (immediate), or adr (address)
@@ -112,6 +114,7 @@ li $v0, 42
 syscall
 .end_macro
 
+# only accept register inputs
 .macro pushr (%value)
 addi $sp, $sp, -4
 sw %value, 0($sp)
