@@ -249,7 +249,7 @@ SanitizeInput:
 	.include "monoLSB.asm"
 	.include "keyMonoLSB.asm"
 	.include "keyChromLSB.asm"
-	.include "keySimpleMonoLSB.asm"
+	#.include "keySimpleMonoLSB.asm"
 
 
 exit:
